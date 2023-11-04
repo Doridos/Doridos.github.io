@@ -1,0 +1,158 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+### Problem set Diamonds
+
+------------------------------------------------------------------------
+
+```{r Loading data set}
+library(ggplot2)
+data(diamonds)
+ggplot(diamonds, aes(x = price, fill = cut)) + 
+  geom_histogram() +
+  scale_fill_brewer(type = 'qual') +
+  facet_wrap(~color)
+```
+
+```{r Price vs Table colored by cut}
+ggplot(diamonds, aes(x = table, y = price, color = cut)) + 
+  geom_point(position = position_jitter(), alpha = 0.33) +
+  scale_color_brewer(type = 'qual') + 
+  xlim(50, 80)
+```
+### What is the typical table range fot the majority of diamonds of ideal cut?
+The range is from 53 to 57.
+### What is the typical table range fot the majority of diamonds of premium cut?
+The range is from 58 to 62.
+
+```{r Scatterplot of diamond price vs volume}
+diamonds$volume <- diamonds$x * diamonds$y * diamonds$z
+
+ggplot(diamonds, aes(x = volume, y = price, color = clarity)) + 
+  geom_point(position = position_jitter(), alpha = 0.33) +
+  scale_color_brewer(type = 'div') + 
+  xlim(0, quantile(diamonds$volume, 0.99)) + 
+  scale_y_log10()
+```
+
+```{r Facebook user activity based on friendship initiated}
+pf <- read.csv('pseudo_facebook.tsv', sep='\t')
+pf$prop_initiated <- pf$friendships_initiated / ifelse(pf$friend_count>0, pf$friend_count, 1)
+```
+
+```{r Prop initiated vs tenure}
+pf$year_joined <- 2014-ceiling(pf$tenure/365)
+pf$year_joined.bucket <- cut(pf$year_joined, breaks=c(2004,2009,2011,2012,2014), right=TRUE)
+
+ggplot(pf, aes(x=tenure, y=prop_initiated, color=year_joined.bucket)) +
+  geom_line(stat='summary', fun = 'median', na.rm=TRUE)
+```
+
+```{r Smoothing prop_initated vs tenure}
+ggplot(pf, aes(x=25*round(tenure/25), y=prop_initiated, color=year_joined.bucket)) +
+  geom_line(stat='summary', fun.y=median, na.rm=TRUE)
+```
+
+```{r Mean of most prop initiated}
+mean(pf$prop_initiated[pf$year_joined.bucket=='(2012,2014]'], na.rm=TRUE)
+0.643
+```
+
+```{r Price/Carat Binned, Faceted, & Colored}
+ggplot(diamonds, aes(x = cut, y = price/carat, color = color)) + 
+  geom_point(position = position_jitter(), alpha = 0.33) +
+  scale_color_brewer(type = 'div') + 
+  facet_wrap(~clarity)
+```
+
+```{r Gapminder data}
+library('xlsx', quietly=TRUE)
+library(reshape2)
+library(dplyr, quietly=TRUE)
+gdp <- read.xlsx('gdp.xlsx', sheetIndex=1)
+children <- read.xlsx('children.xlsx', sheetIndex=1)
+literacy <- read.xlsx('literacy.xlsx', sheetIndex=1)
+
+df_countries <- function(df){
+  # clean up the country column
+  colnames(df)[1] <- 'country'
+  df$country <- gsub(' ','_',df$country)
+  df$country <- gsub(',','',df$country)
+  ###rownames(df) <- df$country
+  return(df)
+}
+
+countries <- function(df){
+  countries_list <- as.character(df$country)
+}
+years <- function(df){
+  years_list <- as.numeric(gsub('X','',colnames(df)[-1]))
+}
+
+gdp[ncol(gdp)] <- NULL
+gdp <- gdp[!is.na(gdp[[1]]),]
+children[ncol(children)] <- NULL
+children <- children[!is.na(children[[1]]),]
+literacy[ncol(literacy)] <- NULL
+literacy <- literacy[!is.na(literacy[[1]]),]
+
+gdp <- df_countries(gdp)
+gdp_countries <- countries(gdp)
+gdp_years <- years(gdp)
+
+children <- df_countries(children)
+children_countries <- countries(children)
+children_years <- years(children)
+
+literacy <- df_countries(literacy)
+literacy_countries <- countries(literacy)
+literacy_years <- years(literacy)
+
+gdp2005 <- gdp[,c('country','X2005')]
+colnames(gdp2005)[2] <- 'gdp'
+gdp2005$gdp = as.numeric(gsub("k", "e3", gdp2005$gdp))
+
+children2005 <- children[,c('country','X2005')]
+colnames(children2005)[2] <- 'children'
+
+literacy2005 <- literacy[,c('country','X2005')]
+colnames(literacy2005)[2] <- 'literacy'
+
+df2005 <- merge(gdp2005, literacy2005, by='country', all=FALSE) %>% merge(children2005, by='country', all=FALSE)
+df2005$children_groups <- cut(df2005$children, breaks=5)
+
+ggplot(df2005, aes(x=gdp, y=children,color=children_groups, size=children)) + 
+  geom_point() +
+  xlab('GDP') +
+  ylab('Literacy') +
+  ggtitle('The Relationship Between GDP, literacy, and number of children in 2005')
+
+# Median of number of children over all countries 
+
+children2 <- melt(children, id.vars='country', na.rm=TRUE, variable.name='year')
+children2$year <- as.numeric(gsub('X','',children2$year))
+
+ggplot(subset(children2, children2$year < 2020), aes(x=year, y=value)) + 
+  geom_line(stat='summary', fun = 'median') +
+  xlab('Year') +
+  ylab('Median of children') +
+  ggtitle('Worldwide Median children from 1980-2020')
+
+
+gdp2 <- melt(gdp, id.vars='country', na.rm=TRUE, variable.name='year')
+gdp2$year <- as.numeric(gsub('X','',gdp2$year))
+gdp2$country <- factor(gdp2$country)
+
+set.seed(1)
+random_countries <- sample( levels(gdp2$country), 16)
+
+ggplot(subset(gdp2, country %in% random_countries & gdp2$year < 2020), aes(x=year, y=value)) +
+  facet_wrap(~country) + 
+  geom_point() +
+  xlab('Year') +
+  ylab('GDP') +
+  ggtitle('GDP from 1980-2020')
+```

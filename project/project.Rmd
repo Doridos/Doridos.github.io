@@ -1,0 +1,403 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Loans exploration by Vladyslav Babyč
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using
+# in your analysis in this code chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk.
+# This prevents the code from displaying in the knitted HTML output.
+# You should set echo=FALSE for all code chunks in your file.
+
+library(ggplot2)
+library(lubridate)
+library('GGally')
+library('scales')
+library('memisc')
+library('lattice')
+library('MASS')
+library('car')
+library('reshape')
+library('plyr')
+library('dplyr')
+```
+This report explores a dataset containing details for approximately 114,000 loans. The dataset used was provided by Prosper company.
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+loans <- read.csv(file = 'prosperLoanData.csv')
+dim(loans)
+str(loans)
+summary(loans)
+```
+Our dataset consists of 81 variables, with almost 114,000 observations.
+# Univariate Plots Section
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots}
+ggplot(data = loans, aes(x = LoanOriginalAmount)) + geom_histogram()
+```
+
+The count of plots does not seem that it has some common distribution. It seems to me that the amount of lendet money is pretty random. Of course we can see that the majority of loans is made for a "small" amount of money, but we can also see some peaks at around 10,000\$ and 15,000\$. It is also interesting to see that there is a gap between 25,000\$ and 30,000\$. I wonder hot this plot will look like with the categorical variables of Employment status, whether the borrower is homeowner and what income does borrower have.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots2}
+ggplot(data = loans, aes(x = EmploymentStatus)) + geom_bar()
+ggplot(data = loans, aes(x = IsBorrowerHomeowner)) + geom_bar()
+ggplot(data = loans, aes(x = IncomeRange)) + geom_bar()
+```
+
+
+Based on this plots we can see that most people who take loans are employed, it does not depend if borrower is homeowner, because the number of lenders is same in both categories. However, we can see interesting distribution of income levels. 
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots3}
+ggplot(data = loans, aes(x = MonthlyLoanPayment)) + geom_histogram()
+ggplot(data = loans, aes(x = MonthlyLoanPayment)) + geom_histogram() + scale_x_continuous(limits = c(0,1000))
+summary(loans$MonthlyLoanPayment)
+```
+
+After discovering that in the monthly payment is 0\$ in some loans I might omit these values in future observations. Also we can see that the highest monthly payment is 2251.5\$ which is pretty high. I am also interested if these monthly payments are somehow related to the APR (annual percentage rate) on concrete loan.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots4}
+loans$BorrowerAPRinPercent <- loans$BorrowerAPR * 100
+loans$BorrowerAPRinPercent <- ifelse(is.na(loans$BorrowerAPRinPercent), median(loans$BorrowerAPRinPercent), loans$BorrowerAPRinPercent)
+ggplot(data = loans, aes(x = BorrowerAPRinPercent)) + geom_histogram()
+summary(loans$BorrowerAPRinPercent)
+```
+
+I have transformed BorrowerAPR variable into BorroweAPRinPercent variable, because for me it is better for understanding in that numerical form. I hope for you too. There also were some NA values, so I replaced them with the median of the value. We see that the percentages of APR vary a lot from 10% to 40%.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots5}
+ggplot(data = loans, aes(x = OpenCreditLines)) + geom_histogram()
+ggplot(data = loans, aes(x = OpenCreditLines)) + geom_histogram(binwidth = 0.5) + scale_x_continuous(limits = c(0,20), breaks = seq(0,20,1))
+summary(loans$OpenCreditLines)
+```
+
+Based on this plot we can see that the most people tend to have between 6 and 12 credit lines open, which seems a lot too me.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots6}
+ggplot(data = loans, aes(x = StatedMonthlyIncome)) + geom_histogram()
+summary(loans$StatedMonthlyIncome)
+ggplot(data = loans, aes(x = StatedMonthlyIncome)) + geom_histogram() + xlim(0, quantile(loans$StatedMonthlyIncome, 0.95))
+```
+
+We could not see a lot of information based on first graph. However, after creating a summary and limiting x axis to the 0.95 quantile the graph gets clearer. Also this graph confirms that the ranges of income are correct, because salary has equivalent distribution.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots7}
+loans$LoanOriginationYear <- year(ymd_hms(loans$LoanOriginationDate))
+ggplot(data = loans, aes(x = LoanOriginationYear)) + geom_histogram(binwidth = 0.5) + scale_x_continuous(breaks = seq(2005, 2015, 1))
+```
+
+To understand which in which year people took loans the most we can look at the LoanOriginationYear. Which is a new varible which I created from LoanOriginationDate.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots8}
+loans$LoanOriginationMonth <- month(ymd_hms(loans$LoanOriginationDate))
+ggplot(data = loans, aes(x = LoanOriginationMonth)) + geom_histogram(binwidth = 0.5) + scale_x_continuous(breaks = seq(1, 12, 1))
+```
+
+Also it is interesting to see whether there is a dependency between month of a year and borrowing money (taking a loan).
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Univariate_Plots9}
+ggplot(data = loans, aes(x = DebtToIncomeRatio)) + geom_histogram() 
+ggplot(data = loans, aes(x = DebtToIncomeRatio)) + geom_histogram() + scale_x_continuous(limits = c(0,1))
+```
+
+From the first graph of DebtToIncomeRatio we do not see a lot, because there are some extreme values. On the second graph if we change the x scale the graph gets clearer. We can also examine DebtToIncome ratio and see if there is some trend between this value and loan taking.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Univariate_Plots10}
+ggplot(data = loans, aes(x = LoanStatus)) + geom_bar() 
+
+```
+
+Last but not least thing to look at is the loan status, we can see that in this dataset the most of the loans are in the current state, which means that they are active, and the second biggest chunk is in the status of completed.
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+There are 113,937 loans in the dataset with 84 features (originally there were 81, but I added some features for the better understanding of dataset), in my opinion the most interestring of them are: LoanOriginalAmount, EmploymentStatus, IsBorrowerHomeowner, IncomeRange, MonthlyLoanPayment, BorrowerAPRinPercent, OpenCreditLines, StatedMonthlyIncome, LoanOriginationYear, LoanOriginationMonth, DebtToIncomeRatio, LoanStatus. We can see that there is no some distribution of the ammount of loans, but in BorrowerAPR there is slightly pattern which may remind normal distribution.
+Other observation:
+
+- The median of total loan amount is 6500\$.
+- There is normal distribution of incomes of people.
+- Most of the people state that they are employed.
+- Most of the people have MonthlyLoan payment smaller than 750\$.
+- We can see that it was in the year 2013 when the majority of loans were taken.
+
+### What is/are the main feature(s) of interest in your dataset?
+
+The main features are LoanOriginalAmount, BorrowerAPR and Term of loan. Based on that information we can calculate how much money will person pay, and in case that the person is not paying in time we can calculate how much will the person overpay for that loan, because of delay.
+
+### What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+To support investigation the features as EmploymentStatus, IncomeRange and MonthlyLoanPayment might be useful. Also we can maybe look at loans which were not payed and find some dependency to predict if the loan requster will be able to pay it or no.
+
+### Did you create any new variables from existing variables in the dataset?
+
+Yes I created three new variables, I transformed BorrowerAPR to BorrowerAPRinPercent to better understand the numbers in terms of graphs (for me and maybe for somebody else these numbers may be more readable than the decimals). Also I have split the LoanOriginationDate into months and years to find some trend in these data.
+
+### Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+
+I did not see any unusual distribution. I hoped that I will see more trends going on and be able to spot some trends in this data, but it looks like the loans are very different based on each person. In my first part of this document I had to scale axis a lot to better understand the data in the graphs, also I had to limit some observations to exclude extreme values so these did not interfere with the observed data. I dont say that these extreme data are wrong, they might be right observations, but I wanted to look into majority of dataset. These extreme data might be valuable in the following parts of research.
+
+
+# Bivariate Plots Section
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots}
+set.seed(2120540)
+list <- list("LoanOriginalAmount", "EmploymentStatus", "IsBorrowerHomeowner", "IncomeRange", "MonthlyLoanPayment", "BorrowerAPRinPercent", "OpenCreditLines", "StatedMonthlyIncome", "LoanOriginationYear", "LoanOriginationMonth", "DebtToIncomeRatio", "LoanStatus")
+loans_samp <- loans[sample(1:length(loans$IncomeRange), 10000), ]
+loans_samp = loans_samp[, colnames(loans_samp) %in% list]
+loans_samp_numeric <- select_if(loans_samp, is.numeric)
+round(cor(loans_samp_numeric), 2)
+```
+We can see some basic correlations from the summary above, but lets examine the data in more detail.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots1}
+ggpairs(loans_samp, 
+  lower = list(continuous = wrap("points", shape = I('.'))), 
+  upper = list(combo = wrap("box", outlier.shape = I('.'))))
+```
+
+We can see that MonthlyLoanPayment has strong correlation with LoanOriginalAmount, but it is also slightly corelted with loan origination year which is interesting. We can also see that Stated monthly income is moderately correlated with LoanOiriginal amount.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots2}
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = StatedMonthlyIncome)) + 
+  geom_point()
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = StatedMonthlyIncome)) + 
+  geom_point() + scale_y_continuous(limits = c(0, 250000))
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = StatedMonthlyIncome)) + 
+  geom_point(alpha = 0.33, position = position_jitter()) + scale_y_continuous(limits = c(0, 100000))
+```
+
+We can see that there are extremely high lines in some of the LoanOriginations amounts in 150,000 and 250,000. It might be intresting to look into detail later in the research. However, we cannot see any pattern in this data, only thing that I spotted is that people have to have at least 7500 to be able to get a loan in amount greater than 250,000.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots3}
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = LP_CustomerPayments)) + 
+  geom_point()
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = LP_CustomerPayments)) + 
+  geom_point(alpha = 0.33, position = position_jitter()) + scale_y_continuous(limits = c(0, 20000))
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = LP_CustomerPayments)) + 
+  geom_point(alpha = 0.33, position = position_jitter()) + scale_x_continuous(limits = c(0, 10000)) 
+```
+
+These graphs state interesting trend in the loans and total payments. We can see that on the first graph the relationship is linear, but on the second graph it becomes more linear, these gives us interesting insides to data. Moving to the third graph, we can see again the linear relationship. I think that it is quite interesting to see changing of relationship based just on limiting the axis.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots4}
+ggplot(data = loans, aes(x = BankcardUtilization, y = AvailableBankcardCredit)) + 
+  geom_point() + scale_x_continuous(limits = c(0,1)) + scale_y_continuous(limits = c(0,20000))
+```
+
+I also wanted to examine how if there is some dependency between availableBankcardCredit and utilization of that bankcard. However from the graph we cannot derive any conclusion.
+
+Now let's move on to some categorical variables.
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots5}
+loans$IncomeRange <- as.factor(loans$IncomeRange)
+loans$IncomeRange <- factor(loans$IncomeRange, levels=c('$0', '$1-24,999', '$25,000-49,999', '$50,000-74,999', 
+                                        '$75,000-99,999', '$100,000+', 'Not displayed', 'Not employed'))
+ggplot(data = loans, aes(x = IncomeRange, y = LoanOriginalAmount)) + 
+  geom_boxplot()
+by(loans$LoanOriginalAmount,loans$IncomeRange, summary)
+```
+It looks like there is a trend that people which have higher income range tend to loan more money, this trend has one exclusion which are the people which have 0\$ monthly income.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots6}
+ggplot(data = loans, aes(x = EmploymentStatus, y = LoanOriginalAmount)) + 
+  geom_boxplot()
+```
+
+Again based on this plot we cannot come to any conclusion about the trend, I think that these data only show us that all people tent to get loans. Only thing that we see is that employed people get loans more.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, StatisticsBi}
+by(loans$LoanOriginalAmount,loans$EmploymentStatus, summary)
+```
+
+It is also quite interesting to see from the statistics, that people who are not employed have same median of Original Loan amount as people with other employment status. However if we look at higher quartiles we see big differences between these two groups.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots7}
+loans$LoanStatus <- as.factor(loans$LoanStatus)
+loans$LoanStatus <- factor(loans$LoanStatus, levels=c('Cancelled', 'Chargedoff', 'Completed', 'Current',
+                                        'Defaulted', 'FinalPaymentInProgress', 'Past Due (1-15 days)', 'Past Due (16-30 days)', 'Past Due (31-60 days)', 'Past Due (61-90 days)', 'Past Due (91-120 days)',
+                                        'Past Due (>120 days)'))
+
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = LoanStatus)) + 
+  geom_boxplot()
+```
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, StatisticsBi1}
+by(loans$LoanOriginalAmount,loans$LoanStatus, summary)
+```
+
+From the graph and data above we can see, that the most loans are still in the current state and that the amounts of have the widest spread on x-scale. We can also see that loans which amount were not that big, were canceled which is I think a great think for the organization. 
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots8}
+loans$LoanOriginationMonth <- as.factor(loans$LoanOriginationMonth)
+ggplot(data = loans, aes(x = LoanOriginationMonth, y = LoanOriginalAmount)) + 
+  geom_boxplot()
+```
+
+If we look at this graph we can see quite interesting thing. People take loans with lower amount in the middle of a year and to the end of a year the amount of loan grows.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Bivariate_Plots9}
+loans$LoanOriginationYear <- as.factor(loans$LoanOriginationYear)
+ggplot(data = loans, aes(x = LoanOriginationYear, y = LoanOriginalAmount)) + 
+  geom_boxplot()
+```
+
+Based on the years graph I suppose that there was a trend before the age 2008 when people took loans, because they had to or they just wanted to buy a property. However, we can see that after 2008 the amounts of loans were on the level of year 2006. From 2008 it took customers of this company 3 years to make comeback in the LoanOriginalAmount, finally in 2011 the company came to the same (slightly higher) amount of loans as in the 2008. From that year there was only a rise in the amount of loans which were taken, which I suppose might be because of inflation or maybe because of some other factors on the financial market.
+
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+I have found relationship between LoanOriginalAmount and LP_CustomerPayments. I also find some relationship between IncomeRange and LoanOriginalAmount. The most surprising thing for me was the dependency which I did not expect to see. The dependency about which I am talking about is between month and LoanOriginal amount. Based on observations of other shown graphs, which made me think that every loan is very unique and that there are not many dependencies between a lot of provided variables, I was quite surprised to see a trend in the graph which showed that during the middle of a year the amounts of loans are not so high as in the months at the end and at the start of a year.
+
+
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)? 
+
+I found interesting relationship between the years and months in which loans were taken. This was quite a surprising thing to see, because based on the other variables, there are not many dependencies between them.
+
+### What was the strongest relationship you found?
+
+The strongest relationship which I found was between LP_CustomerPayments and LoanOriginalAmount which is quite logical, because the higher amount was the loan, the higher amount has person to pay in order to complete this loan. However, this is not as easy conclusion as it may seem. I found it interesting because there can be wide variety of lengths for loans, but even though there is this length parameter we see almost linear relationship between the total amount and customer payment.
+
+
+# Multivariate Plots Section
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = EmploymentStatus), data = loans) + 
+  geom_line() +
+  scale_color_brewer(type = 'div') 
+
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = IncomeRange), data = loans) + 
+  geom_line() +
+  scale_color_brewer(type = 'div') 
+
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = LoanStatus), data = loans) + 
+  geom_line() +
+  scale_color_brewer(type = 'div') 
+```
+
+These plots above are pretty hard to read, because of a huge amount of data and extreme values in them. They show us the previous exploration, that there is only limited amount of data which is related to each other and due to extremes in loan cases. Let's look at these same graphs in dots rather than in lines.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots1}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = EmploymentStatus), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div')
+
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = IncomeRange), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div')
+
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = LoanStatus), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div')
+```
+
+Here we can see better distribution of these graphs. Partially because, we have chosen really dependent variables as of LoanOriginalAmount and MonthlyLoanPayment.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots2}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = EmploymentStatus), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div') + facet_wrap(~IncomeRange)
+```
+
+I that particular graph we can see interesting thing, which is that people who are employed and become 50,000\$+ tend to take higher loans and have higher monthly payment. We can spot that by looking at upper line which shows us that MonthlyLoanPayment of each graph gets steeper towards giher income ranges.
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots3}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = EmploymentStatus), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div') + facet_wrap(~LoanStatus)
+```
+
+In the facet wrap by LoanStatus we spot relation, that completed loans had higher monthlyLoanPayment among all other graphs.
+
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots4}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = EmploymentStatus), data = loans) + 
+  geom_point(alpha = 0.5, position = 'jitter', aes(size = StatedMonthlyIncome)) +
+  scale_color_brewer(type = 'div') + scale_y_continuous(limits = c(0,1000))
+```
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots5}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = IncomeRange), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div') + scale_y_continuous(limits = c(0,1000)) + scale_x_log10()
+```
+
+If we look at other variables and try to see some more depencdencies we cannot spot a lot of them. It seems that the theory of each loan being very individual is true.
+
+
+```{r echo= FALSE, message=FALSE, warning=FALSE, Multivariate_Plots6}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = LoanOriginationYear), data = loans) + 
+  geom_point(alpha = 0.5, position = 'jitter') +
+  scale_color_brewer(type = 'div') + scale_y_continuous(limits = c(0,1000)) + scale_x_log10()
+
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = LoanOriginationMonth), data = loans) + 
+  geom_point(alpha = 0.5, position = 'jitter') +
+  scale_color_brewer(type = 'div') + scale_y_continuous(limits = c(0,1000)) + scale_x_log10()
+```
+
+Coming back to the dependency on time when the loan was taken we can se interesting thing in graph, in which colors determined by the year of a loan. We can clearly see that the majority of loans were taken more to the present time and that their amounts are higher than the amounts in the past.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+It was the strengthened in my observation that based on a loan size the monthly payment increases. I also tried to find dependency in BorrowerAPR to connect it with some other variable but i didn't see any dependency here.
+
+### Were there any interesting or surprising interactions between features?
+
+I think that it is interesting to see that majority of loans with high amounts are still in the current state of loan.
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo= FALSE, message=FALSE, warning=FALSE, Plot_One}
+ggplot(data = loans, aes(x = LoanOriginalAmount)) + 
+  geom_histogram(binwidth = 500) +xlab("Amount of loan (in dollars)") + 
+  ylab("Number of loans") + ggtitle("Amount of loans") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Description One
+
+We cannot see any particular distribution of amount of loan, but we can see interesting peaks in the round number of amount of loans. It appears that a numerous loans have been taken out on round amounts such as 5,000\$, 10,000\$, 15,000\$, 20,000\$, 25,000\$ 
+
+### Plot Two
+```{r echo= FALSE, message=FALSE, warning=FALSE, Plot_Two}
+ggplot(data = loans, aes(x = LoanOriginalAmount, y = LoanStatus, fill= LoanStatus)) + 
+  geom_boxplot() +  scale_color_brewer(palette="Dark2") + theme(legend.position="none") +
+  xlab("Amount of loan (in dollars)") + ylab("Status of a loan") +
+  ggtitle("Loan amounts by Loan status") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Description Two
+
+The lowest median for Status of a loan have loans which were canceled. On the other hand the highest median have loans with current state. Same proportion of loans are in the defaulted and completed state with the difference that completed loans have higher maximum amount of loan. In the graph we can also spot interesting pattern in the past due loans.
+
+### Plot Three
+```{r echo= FALSE, message=FALSE, warning=FALSE, Plot_Three}
+ggplot(aes(x = LoanOriginalAmount, y = MonthlyLoanPayment, color = IncomeRange), data = loans) + 
+  geom_point(alpha = 0.5, size = 1, position = 'jitter') +
+  scale_color_brewer(type = 'div') + scale_y_continuous(limits = c(0,1000)) + scale_x_log10() +
+  xlab("Loan original amount") + ylab("Monthy payment of a loan") + 
+  ggtitle("Log_10 Loan amounts by Monthly loan payment and Income range") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Description Three
+
+The plot indicates that there is relation between Monthly payment of a loan and Loan original amount. Based on income range of person we can also see that wealthier people could afford taking a bigger amount of a loan as the color of dots suggest.
+
+------
+
+# Reflection
+
+The loans data set contains information on almost 114,000 loans, across 81 variables from around 2005. I started my observation by understanding basic variables presented in the data set and chose ones that were the most relevant for my EDA. I found myself asking questions to explore and dig deeper into a data. After performing an observation of a basic variables I combined them to see complex image of a story which these data provide.
+
+In this data I have found strong relationship between Loan amount and monthly payment. Which may seem obvious, but there can be also differences in the term of a loan which change the monthly payment. However despite presence of this variable, the dependency is almost linear. Other interesting thing that I found is relatinship between loan taking and month of taking a loan. I discovered trends how the financial crisis in 2008 affected the loan market and also performed analysis of how variables in this data set are related.
+
+I have come to conclusion that it is not easy to create a prediction model for approval of loan nor the prediction of amount of loan based on information provided about the person. After that I became even more fascinated with the algorithms which companies for providing loans have for assessment of their candidates. For me it seems like every case of loan is very individual and has to be handled respectfully to all occasions. If I were to continue on exploration of this data set I would try to perform an analysis, where I would look into variables such as credit card information, different indexes and so on. I also think that in this data set there is a lot of technical data but personally for me I would appreciate if there were more data on concrete person e.g. as age, education and others. This would maybe help to create a prediction model which might be useful to some extent.
